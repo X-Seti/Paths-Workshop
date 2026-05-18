@@ -672,10 +672,10 @@ class PathsWorkshop(RadarWorkshop):  #vers 4
     }
 
     def __init__(self, parent=None, main_window=None):  #vers 4
-        # RadarWorkshop.__init__ calls self.setup_ui() internally
-        # Our setup_ui override runs AFTER super().__init__ sets up all radar state
-        self._path_tabs_ready = False
+        # Defer auto setup_ui so we can override it cleanly
+        self._defer_setup_ui = True
         super().__init__(parent, main_window)
+        self.setup_ui()
 
     def setup_ui(self):  #vers 1
         """Override — call super() first to build full RadarWorkshop UI,

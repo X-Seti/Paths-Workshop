@@ -1532,7 +1532,8 @@ class RadarWorkshop(ToolMenuMixin, QWidget): #vers 1
             p = parent.pos()
             self.move(p.x() + 50, p.y() + 80)
 
-        self.setup_ui()
+        if not getattr(self, '_defer_setup_ui', False):
+            self.setup_ui()
         #self._setup_hotkeys()
         self._apply_theme()
         self._apply_preset("SA PC")
