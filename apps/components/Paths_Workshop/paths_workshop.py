@@ -68,7 +68,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QImage, QPolygonF
 
-# RadarWorkshop available for embedding: from apps.components.Paths_Workshop.radar_workshop import RadarWorkshop
+from apps.components.Paths_Workshop.radar_workshop import RadarWorkshop
 
 App_name   = "Paths Workshop"
 App_build  = "Build 2"
@@ -649,7 +649,7 @@ class NodesTab(QWidget):  #vers 1
 # PathsWorkshop — inherits RadarWorkshop
 # ─────────────────────────────────────────────────────────────────────────────
 
-class PathsWorkshop(QWidget):  #vers 3
+class PathsWorkshop(RadarWorkshop):  #vers 4
     App_name   = App_name
     App_build  = App_build
     config_key = config_key
@@ -671,49 +671,35 @@ class PathsWorkshop(QWidget):  #vers 3
         "spath0":  (3,None),
     }
 
-    def __init__(self, parent=None, main_window=None):  #vers 3
-        super().__init__(parent)
-        self.main_window   = main_window
-        self._radar_image: Optional[QImage] = None
-        self._setup_ui()
+    def __init__(self, parent=None, main_window=None):  #vers 4
+        # RadarWorkshop.__init__ calls self.setup_ui() internally
+        # Our setup_ui override runs AFTER super().__init__ sets up all radar state
+        self._path_tabs_ready = False
+        super().__init__(parent, main_window)
 
-    def _setup_ui(self):  #vers 1
-        root = QVBoxLayout(self)
-        root.setContentsMargins(4,4,4,4); root.setSpacing(4)
-        # Toolbar
-        tb = QHBoxLayout()
-        open_btn  = QPushButton("Open…");   open_btn.setFixedHeight(26)
-        save_btn  = QPushButton("Save");    save_btn.setFixedHeight(26)
-        radar_btn = QPushButton("Radar…");  radar_btn.setFixedHeight(26)
-        open_btn.clicked.connect(self._open_path_file)
-        save_btn.clicked.connect(lambda: self._save_current())
-        radar_btn.clicked.connect(self._load_radar_image)
-        self._status_lbl = QLabel("Open a path file to begin")
-        self._status_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        for w in (open_btn, save_btn, radar_btn, self._status_lbl): tb.addWidget(w)
-        root.addLayout(tb)
-        # Tabs
-        self._main_tabs  = QTabWidget()
+    def setup_ui(self):  #vers 1
+        """Override — call super() first to build full RadarWorkshop UI,
+        then inject path tabs into _view_tabs (the Map tab widget)."""
+        super().setup_ui()
+        # Now _view_tabs exists — add path tabs alongside the Map tab
         self._tab_nodes  = NodesTab()
         self._tab_train  = self._make_text_tab("train")
         self._tab_flight = self._make_text_tab("flight")
         self._tab_spath  = self._make_text_tab("spath")
-        self._main_tabs.addTab(self._tab_nodes,  "Nodes")
-        self._main_tabs.addTab(self._tab_train,  "Train / Tracks")
-        self._main_tabs.addTab(self._tab_flight, "Flight Paths")
-        self._main_tabs.addTab(self._tab_spath,  "Static Paths")
-        root.addWidget(self._main_tabs, 1)
-
-    def _set_status(self, msg: str):  #vers 1
-        self._status_lbl.setText(msg)
+        self._view_tabs.addTab(self._tab_nodes,  "Nodes")
+        self._view_tabs.addTab(self._tab_train,  "Train / Tracks")
+        self._view_tabs.addTab(self._tab_flight, "Flight Paths")
+        self._view_tabs.addTab(self._tab_spath,  "Static Paths")
+        self._path_tabs_ready = True
 
     def _save_current(self):  #vers 1
-        idx = self._main_tabs.currentIndex()
+        idx = self._view_tabs.currentIndex() - 1  # offset: tab 0 = Map
         tabs = [self._tab_nodes, self._tab_train, self._tab_flight, self._tab_spath]
-        tab = tabs[idx] if idx < len(tabs) else None
-        if tab and hasattr(tab, 'current_path') and tab.current_path:
-            if hasattr(tab, 'save_file'): tab.save_file(tab.current_path)
-            self._set_status(f"Saved {os.path.basename(tab.current_path)}")
+        if 0 <= idx < len(tabs):
+            tab = tabs[idx]
+            if hasattr(tab,'current_path') and tab.current_path:
+                if hasattr(tab,'save_file'): tab.save_file(tab.current_path)
+                self._set_status(f"Saved {os.path.basename(tab.current_path)}")
 
     def _make_text_tab(self, kind: str) -> QWidget:  #vers 1
         try:
@@ -752,23 +738,23 @@ class PathsWorkshop(QWidget):  #vers 3
             ok=False
         if ok:
             if self._radar_image and hasattr(tab,"set_radar"): tab.set_radar(self._radar_image)
-            self._main_tabs.setCurrentIndex(tab_idx)
+            self._view_tabs.setCurrentIndex(tab_idx + 1)  # +1: tab 0 = Map
             self._set_status(f"Loaded: {os.path.basename(path)}")
         else:
             QMessageBox.critical(self,"Error",f"Failed to load {os.path.basename(path)}")
 
-    def _load_radar_image(self, path: str=None):  #vers 1
+    def _load_radar_image(self, path: str=None):  #vers 2
+        """Load a PNG radar image directly into the node map canvas."""
         if path is None:
-            path,_=QFileDialog.getOpenFileName(self,"Load Radar Image","",
+            path,_=QFileDialog.getOpenFileName(self,"Load Radar Background","",
                 "Images (*.png *.jpg *.bmp);;All files (*)")
         if not path: return
-        img=QImage(path)
+        img = QImage(path)
         if img.isNull():
             QMessageBox.warning(self,"Radar",f"Could not load {path}"); return
-        self._radar_image=img
-        for tab in (self._tab_nodes,self._tab_train,self._tab_flight,self._tab_spath):
+        for tab in (self._tab_nodes, self._tab_train, self._tab_flight, self._tab_spath):
             if hasattr(tab,"set_radar"): tab.set_radar(img)
-        self._set_status(f"Radar: {os.path.basename(path)}")
+        self._set_status(f"Radar background: {os.path.basename(path)}")
 
     def _build_menus_into_qmenu(self, pm):  #vers 1
         fm=pm.addMenu("File")
