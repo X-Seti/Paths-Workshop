@@ -133,6 +133,8 @@ class NodeParser:  #vers 1
             self.game = "sa"     # nodes0.dat..nodes8.dat = SA
         else:
             self.game = "gta3"
+        if self.game == "sa_ipl":
+            return self.load_sa_ipl(path)
         return self.load_sa(path) if self.game == "sa" else self.load_gta3_vc(path)
 
     def load_gta3_vc(self, path: str) -> bool:  #vers 1
@@ -202,6 +204,43 @@ class NodeParser:  #vers 1
             return True
         except Exception as ex:
             print(f"NodeParser.load_sa: {ex}"); return False
+
+    def load_sa_ipl(self, path: str) -> bool:  #vers 1
+        """SA paths.ipl text format:
+        path section contains route headers (2 fields) and node lines (13 fields):
+        node: type, next_node, unk, x, y, z, width, isCar, isPed, isRoad, density, flags[, nodeId]"""
+        try:
+            self.nodes.clear()
+            with open(path, "r", errors="ignore") as f:
+                lines = f.readlines()
+            in_path = False
+            idx = 0
+            for ln in lines:
+                s = ln.strip()
+                if s == "path":  in_path = True;  continue
+                if s == "end":   in_path = False;  continue
+                if not in_path or not s or s.startswith("#"): continue
+                parts = [p.strip() for p in s.split(",")]
+                if len(parts) < 6: continue
+                try:
+                    ntype_val = int(parts[0])
+                    if ntype_val not in (2, 3, 4): continue  # skip route headers (type=1)
+                    x = float(parts[3]); y = float(parts[4]); z = float(parts[5])
+                    is_car = bool(int(parts[7])) if len(parts) > 7 else True
+                    is_ped = bool(int(parts[8])) if len(parts) > 8 else False
+                    flags = (1 if is_car else 0) | (2 if is_ped else 0)
+                    next_node = int(parts[1])
+                    node = PathNode(idx=idx, x=x, y=y, z=z, flags=flags or 1)
+                    if next_node >= 0:
+                        node.links.append(next_node)
+                    self.nodes.append(node)
+                    idx += 1
+                except (ValueError, IndexError):
+                    continue
+            print(f"[NodeParser] SA paths.ipl: {len(self.nodes)} nodes from {os.path.basename(path)}")
+            return bool(self.nodes)
+        except Exception as ex:
+            print(f"NodeParser.load_sa_ipl: {ex}"); return False
 
     def save(self, path: str) -> bool:  #vers 1
         return self.save_sa(path) if self.game == "sa" else self.save_gta3_vc(path)
@@ -616,12 +655,19 @@ class PathsWorkshop(RadarWorkshop):  #vers 2
     config_key = config_key
 
     _ROUTES = {
-        "nodes":   (0,"gta3"),
-        "nodes0":  (0,"sa"), "nodes1":(0,"sa"), "nodes2":(0,"sa"), "nodes3":(0,"sa"),
-        "nodes4":  (0,"sa"), "nodes5":(0,"sa"), "nodes6":(0,"sa"), "nodes7":(0,"sa"),
-        "nodes8":  (0,"sa"),
+        # SA binary nodes (from gta3.img)
+        "nodes":   (0,"gta3"), "nodes0": (0,"sa"), "nodes1": (0,"sa"), "nodes2": (0,"sa"),
+        "nodes3":  (0,"sa"),   "nodes4": (0,"sa"), "nodes5": (0,"sa"), "nodes6": (0,"sa"),
+        "nodes7":  (0,"sa"),   "nodes8": (0,"sa"), "nodes9": (0,"sa"),
+        # SA text paths (DATA/paths*.ipl)
+        "paths":   (0,"sa_ipl"), "paths2":(0,"sa_ipl"), "paths3":(0,"sa_ipl"),
+        "paths4":  (0,"sa_ipl"), "paths5":(0,"sa_ipl"),
+        # GTA3/VC/LC train paths (tracks.dat = GTA3, train.dat = VC/SA)
+        "tracks":  (1,None), "tracks2":(1,None),
         "train":   (1,None), "train2": (1,None),
-        "flight":  (2,None), "flight2":(2,None), "flight3":(2,None),
+        # Flight paths
+        "flight":  (2,None), "flight2":(2,None), "flight3":(2,None), "flight4":(2,None),
+        # VC static paths
         "spath0":  (3,None),
     }
 
@@ -679,7 +725,12 @@ class PathsWorkshop(RadarWorkshop):  #vers 2
         if game is None: game=self._detect_game(path)
         tabs=[self._tab_nodes,self._tab_train,self._tab_flight,self._tab_spath]
         tab=tabs[tab_idx]
-        ok=tab.load_file(path,game) if tab_idx==0 else (tab.load_file(path) if hasattr(tab,"load_file") else False)
+        if tab_idx==0:
+            ok=tab.load_file(path, game)
+        elif hasattr(tab,"load_file"):
+            ok=tab.load_file(path)
+        else:
+            ok=False
         if ok:
             if self._radar_image and hasattr(tab,"set_radar"): tab.set_radar(self._radar_image)
             self._main_tabs.setCurrentIndex(tab_idx)
