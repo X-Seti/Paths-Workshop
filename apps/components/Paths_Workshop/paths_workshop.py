@@ -68,7 +68,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QImage, QPolygonF
 
-from apps.components.Paths_Workshop.radar_workshop import RadarWorkshop
+# RadarWorkshop available for embedding: from apps.components.Paths_Workshop.radar_workshop import RadarWorkshop
 
 App_name   = "Paths Workshop"
 App_build  = "Build 2"
@@ -649,7 +649,7 @@ class NodesTab(QWidget):  #vers 1
 # PathsWorkshop — inherits RadarWorkshop
 # ─────────────────────────────────────────────────────────────────────────────
 
-class PathsWorkshop(RadarWorkshop):  #vers 2
+class PathsWorkshop(QWidget):  #vers 3
     App_name   = App_name
     App_build  = App_build
     config_key = config_key
@@ -662,7 +662,7 @@ class PathsWorkshop(RadarWorkshop):  #vers 2
         # SA text paths (DATA/paths*.ipl)
         "paths":   (0,"sa_ipl"), "paths2":(0,"sa_ipl"), "paths3":(0,"sa_ipl"),
         "paths4":  (0,"sa_ipl"), "paths5":(0,"sa_ipl"),
-        # GTA3/VC/LC train paths (tracks.dat = GTA3, train.dat = VC/SA)
+        # GTA3/VC/LC train paths
         "tracks":  (1,None), "tracks2":(1,None),
         "train":   (1,None), "train2": (1,None),
         # Flight paths
@@ -671,30 +671,49 @@ class PathsWorkshop(RadarWorkshop):  #vers 2
         "spath0":  (3,None),
     }
 
-    def __init__(self, parent=None, main_window=None):  #vers 2
-        super().__init__(parent, main_window)
+    def __init__(self, parent=None, main_window=None):  #vers 3
+        super().__init__(parent)
+        self.main_window   = main_window
         self._radar_image: Optional[QImage] = None
-        self._path_tabs_built = False
-        self._ensure_path_tabs()
+        self._setup_ui()
 
-    def _ensure_path_tabs(self):  #vers 1
-        if self._path_tabs_built: return
-        if hasattr(self,"_main_tabs"):
-            tw=self._main_tabs
-        else:
-            tw=QTabWidget()
-            if hasattr(self,"centre_layout"):
-                self.centre_layout.addWidget(tw)
-            self._main_tabs=tw
+    def _setup_ui(self):  #vers 1
+        root = QVBoxLayout(self)
+        root.setContentsMargins(4,4,4,4); root.setSpacing(4)
+        # Toolbar
+        tb = QHBoxLayout()
+        open_btn  = QPushButton("Open…");   open_btn.setFixedHeight(26)
+        save_btn  = QPushButton("Save");    save_btn.setFixedHeight(26)
+        radar_btn = QPushButton("Radar…");  radar_btn.setFixedHeight(26)
+        open_btn.clicked.connect(self._open_path_file)
+        save_btn.clicked.connect(lambda: self._save_current())
+        radar_btn.clicked.connect(self._load_radar_image)
+        self._status_lbl = QLabel("Open a path file to begin")
+        self._status_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        for w in (open_btn, save_btn, radar_btn, self._status_lbl): tb.addWidget(w)
+        root.addLayout(tb)
+        # Tabs
+        self._main_tabs  = QTabWidget()
         self._tab_nodes  = NodesTab()
         self._tab_train  = self._make_text_tab("train")
         self._tab_flight = self._make_text_tab("flight")
         self._tab_spath  = self._make_text_tab("spath")
-        tw.addTab(self._tab_nodes,  "Nodes")
-        tw.addTab(self._tab_train,  "Train")
-        tw.addTab(self._tab_flight, "Flight")
-        tw.addTab(self._tab_spath,  "Static Paths")
-        self._path_tabs_built=True
+        self._main_tabs.addTab(self._tab_nodes,  "Nodes")
+        self._main_tabs.addTab(self._tab_train,  "Train / Tracks")
+        self._main_tabs.addTab(self._tab_flight, "Flight Paths")
+        self._main_tabs.addTab(self._tab_spath,  "Static Paths")
+        root.addWidget(self._main_tabs, 1)
+
+    def _set_status(self, msg: str):  #vers 1
+        self._status_lbl.setText(msg)
+
+    def _save_current(self):  #vers 1
+        idx = self._main_tabs.currentIndex()
+        tabs = [self._tab_nodes, self._tab_train, self._tab_flight, self._tab_spath]
+        tab = tabs[idx] if idx < len(tabs) else None
+        if tab and hasattr(tab, 'current_path') and tab.current_path:
+            if hasattr(tab, 'save_file'): tab.save_file(tab.current_path)
+            self._set_status(f"Saved {os.path.basename(tab.current_path)}")
 
     def _make_text_tab(self, kind: str) -> QWidget:  #vers 1
         try:
@@ -775,10 +794,11 @@ class PathsWorkshop(RadarWorkshop):  #vers 2
         if path: self._open_path_file(path)
 
 
-def open_paths_workshop(main_window=None, path: str=None):  #vers 1
+def open_paths_workshop(main_window=None, path: str=None):  #vers 2
     from PyQt6.QtWidgets import QApplication
-    app=QApplication.instance() or QApplication(sys.argv)
-    w=PathsWorkshop(main_window=main_window)
-    w.resize(1280,860); w.show()
+    app = QApplication.instance() or QApplication(sys.argv)
+    w = PathsWorkshop(main_window=main_window)
+    w.setWindowTitle(f"Paths Workshop — {PathsWorkshop.App_build}")
+    w.resize(1280, 860); w.show()
     if path: w._open_path_file(path)
     return w
