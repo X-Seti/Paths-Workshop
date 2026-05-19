@@ -53,6 +53,7 @@ Base: RadarWorkshop radar map canvas as background.
 """
 
 import sys, os, math, struct
+from pathlib import Path
 from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
 
@@ -60,15 +61,24 @@ _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.
 if _root not in sys.path: sys.path.insert(0, _root)
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QTabWidget, QDoubleSpinBox, QSpinBox,
-    QPushButton, QFileDialog, QMessageBox, QApplication, QFormLayout,
-    QGroupBox, QCheckBox, QComboBox, QMenu, QSizePolicy, QAbstractItemView
+    QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
+    QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFontComboBox,
+    QFormLayout, QFrame, QGroupBox, QHBoxLayout, QHeaderView, QLabel,
+    QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QPushButton,
+    QScrollArea, QSizePolicy, QSlider, QSpinBox, QSplitter, QStatusBar,
+    QTabWidget, QTextEdit, QToolButton, QVBoxLayout, QWidget
 )
-from PyQt6.QtCore import Qt, QPointF, QRectF, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QImage, QPolygonF
+from PyQt6.QtCore import pyqtSignal, Qt, QPoint, QPointF, QRect, QRectF, QSize, QTimer
+from PyQt6.QtGui import (
+    QAction, QBrush, QColor, QFont, QIcon, QImage,
+    QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QShortcut
+)
 
 from apps.components.Paths_Workshop.radar_workshop import RadarWorkshop
+
+App_name   = "Paths Workshop"
+App_build  = "Build 2"
+config_key = "paths_workshop"
 
 App_name   = "Paths Workshop"
 App_build  = "Build 2"
