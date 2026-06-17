@@ -85,9 +85,9 @@ App_build  = "Build 2"
 config_key = "paths_workshop"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Data class
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 @dataclass
 class PathNode:  #vers 1
@@ -117,9 +117,9 @@ class PathNode:  #vers 1
         return "/".join(t) or "?"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Node parser  (GTA3 / VC / SA)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 class NodeParser:  #vers 1
     """Binary nodes.dat parser for GTA3, VC and SA."""
@@ -291,9 +291,9 @@ class NodeParser:  #vers 1
             print(f"NodeParser.save_sa: {ex}"); return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Node map canvas
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 class NodeMapCanvas(QWidget):  #vers 1
     node_clicked = pyqtSignal(int)
@@ -495,9 +495,9 @@ class NodeMapCanvas(QWidget):  #vers 1
         self._pending_add=(x,y,ntype); self.node_clicked.emit(-9998)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # Nodes Tab
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 class NodesTab(QWidget):  #vers 1
     def __init__(self, parent=None):  #vers 1
@@ -520,7 +520,7 @@ class NodesTab(QWidget):  #vers 1
             cb.stateChanged.connect(self._filter_changed); fr.addWidget(cb)
         fr.addStretch(); ll.addLayout(fr)
 
-        self._search=QLineEdit(); self._search.setPlaceholderText("Search…")
+        self._search=QLineEdit(); self._search.setPlaceholderText("Search_")
         self._search.textChanged.connect(self._filter_changed); ll.addWidget(self._search)
 
         self._list=QListWidget(); self._list.setFont(QFont("Monospace",8))
@@ -533,7 +533,7 @@ class NodesTab(QWidget):  #vers 1
         self._fz=QDoubleSpinBox(); self._fz.setRange(-1000,1000);   self._fz.setDecimals(2)
         self._ftype=QComboBox(); self._ftype.addItems(["Car","Ped","Boat"])
         self._fdis=QCheckBox("Disabled")
-        self._flabel=QLabel("—")
+        self._flabel=QLabel("--")
         for lbl,w in (("X",self._fx),("Y",self._fy),("Z",self._fz),
                       ("Type",self._ftype),("",self._fdis),("Links",self._flabel)):
             fl.addRow(lbl,w)
@@ -572,7 +572,7 @@ class NodesTab(QWidget):  #vers 1
             self._path=path; self._refresh_list()
             self._map.set_nodes(self._parser.nodes)
             self._status.setText(
-                f"{os.path.basename(path)}  —  {len(self._parser.nodes)} nodes  ({self._parser.game.upper()})")
+                f"{os.path.basename(path)}  --  {len(self._parser.nodes)} nodes  ({self._parser.game.upper()})")
         return ok
 
     def save_file(self, path: str) -> bool:  #vers 1
@@ -613,7 +613,7 @@ class NodesTab(QWidget):  #vers 1
         self._fx.setValue(n.x); self._fy.setValue(n.y); self._fz.setValue(n.z)
         self._ftype.setCurrentIndex(1 if n.is_ped else (2 if n.is_boat else 0))
         self._fdis.setChecked(n.disabled)
-        self._flabel.setText(f"{len(n.links)} → {n.links[:5]}" + ("…" if len(n.links)>5 else ""))
+        self._flabel.setText(f"{len(n.links)} -> {n.links[:5]}" + ("_" if len(n.links)>5 else ""))
         self._blocking=False
         self._map._sel_idx=idx; self._map.update()
 
@@ -655,11 +655,11 @@ class NodesTab(QWidget):  #vers 1
         self._cur_idx=-1; self._refresh_list(); self._map.set_nodes(self._parser.nodes)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PathsWorkshop — inherits RadarWorkshop
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# PathsWorkshop -- inherits RadarWorkshop
+# -----------------------------------------------------------------------------
 
-# ── Waypoint / text path support ─────────────────────────────────────────────
+# -- Waypoint / text path support ---------------------------------------------
 
 from dataclasses import dataclass, field as _field
 
@@ -774,16 +774,16 @@ class _WaypointTab(QWidget):  #vers 1
             for i, w in enumerate(wps):
                 self._list.addItem(f"[{i:4d}] {w.x:9.2f} {w.y:9.2f} {w.z:7.2f}"
                                    + (f"  spd:{w.speed:.1f}" if self._has_speed else ""))
-            self._status.setText(f"{os.path.basename(path)} — {len(wps)} waypoints")
+            self._status.setText(f"{os.path.basename(path)} -- {len(wps)} waypoints")
         return ok
 
     @property
     def current_path(self): return self._path
 
-    def set_radar(self, img): pass  # interface compat — no map canvas in text tabs
+    def set_radar(self, img): pass  # interface compat -- no map canvas in text tabs
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 class PathsWorkshop(RadarWorkshop):  #vers 4
     App_name   = App_name
@@ -814,10 +814,10 @@ class PathsWorkshop(RadarWorkshop):  #vers 4
         self.setup_ui()
 
     def setup_ui(self):  #vers 1
-        """Override — call super() first to build full RadarWorkshop UI,
+        """Override -- call super() first to build full RadarWorkshop UI,
         then inject path tabs into _view_tabs (the Map tab widget)."""
         super().setup_ui()
-        # Now _view_tabs exists — add path tabs alongside the Map tab
+        # Now _view_tabs exists -- add path tabs alongside the Map tab
         self._tab_nodes  = NodesTab()
         self._tab_train  = self._make_text_tab("train")
         self._tab_flight = self._make_text_tab("flight")
@@ -884,8 +884,8 @@ class PathsWorkshop(RadarWorkshop):  #vers 4
 
     def _build_menus_into_qmenu(self, pm):  #vers 1
         fm=pm.addMenu("File")
-        fm.addAction("Open Path File…", self._open_path_file)
-        fm.addAction("Load Radar Image…", self._load_radar_image)
+        fm.addAction("Open Path File_", self._open_path_file)
+        fm.addAction("Load Radar Image_", self._load_radar_image)
         fm.addSeparator()
         fm.addAction("Open nodes.dat (GTA3/VC)", lambda:self._open_specific("gta3"))
         fm.addAction("Open nodes0-8.dat (SA)",   lambda:self._open_specific("sa"))
@@ -910,7 +910,7 @@ def open_paths_workshop(main_window=None, path: str=None):  #vers 2
     from PyQt6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication(sys.argv)
     w = PathsWorkshop(main_window=main_window)
-    w.setWindowTitle(f"Paths Workshop — {PathsWorkshop.App_build}")
+    w.setWindowTitle(f"Paths Workshop -- {PathsWorkshop.App_build}")
     w.resize(1280, 860); w.show()
     if path: w._open_path_file(path)
     return w
