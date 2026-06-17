@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#this belongs in apps/components/Paths_Workshop/paths_workshop.py - Version: 2
+#this belongs in apps/components/Paths_Workshop/paths_workshop.py - Version: 3
 # X-Seti - May18 2026 - Paths Workshop
 """
 Paths Workshop - GTA III/VC/SA path node editor.
@@ -659,6 +659,132 @@ class NodesTab(QWidget):  #vers 1
 # PathsWorkshop — inherits RadarWorkshop
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Waypoint / text path support ─────────────────────────────────────────────
+
+from dataclasses import dataclass, field as _field
+
+@dataclass
+class _Waypoint:  #vers 1
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    speed: float = 0.0
+    flags: int = 0
+    comment: str = ""
+
+
+class _TextPathParser:  #vers 1
+    def __init__(self):
+        self.waypoints = []
+        self.header_lines = []
+
+    def load(self, path: str) -> bool:
+        try:
+            self.waypoints.clear(); self.header_lines.clear()
+            lines = open(path, 'r', errors='ignore').readlines()
+            data = [l for l in lines if l.strip() and not l.strip().startswith(';')]
+            if not data: return False
+            try: count = int(data[0].strip()); start = 1
+            except ValueError: start = 0
+            for ln in data[start:]:
+                parts = ln.split()
+                if len(parts) >= 3:
+                    try:
+                        w = _Waypoint(x=float(parts[0]), y=float(parts[1]), z=float(parts[2]),
+                                      speed=float(parts[3]) if len(parts) > 3 else 0.0,
+                                      flags=int(parts[4]) if len(parts) > 4 else 0)
+                        self.waypoints.append(w)
+                    except ValueError: pass
+            print(f"[TextPathParser] {len(self.waypoints)} waypoints from {os.path.basename(path)}")
+            return bool(self.waypoints)
+        except Exception as ex:
+            print(f"_TextPathParser.load: {ex}"); return False
+
+    def save(self, path: str) -> bool:
+        try:
+            with open(path, 'w') as f:
+                f.write(f"{len(self.waypoints)}\n")
+                for w in self.waypoints:
+                    f.write(f"{w.x:.4f}\t{w.y:.4f}\t{w.z:.4f}\t{w.speed:.4f}\t{w.flags}\n")
+            return True
+        except Exception as ex:
+            print(f"_TextPathParser.save: {ex}"); return False
+
+
+class _IplPathParser:  #vers 1
+    def __init__(self):
+        self.waypoints = []
+
+    def load(self, path: str) -> bool:
+        try:
+            self.waypoints.clear()
+            in_path = False
+            for ln in open(path, 'r', errors='ignore'):
+                s = ln.strip()
+                if s == 'path':  in_path = True;  continue
+                if s == 'end':   in_path = False;  continue
+                if not in_path or not s or s.startswith('#'): continue
+                parts = [p.strip() for p in s.split(',')]
+                if len(parts) < 6: continue
+                try:
+                    ntype = int(parts[0])
+                    if ntype not in (2, 3, 4): continue
+                    w = _Waypoint(x=float(parts[3]), y=float(parts[4]), z=float(parts[5]),
+                                  flags=(1 if (len(parts) > 7 and int(parts[7])) else 2))
+                    self.waypoints.append(w)
+                except (ValueError, IndexError): pass
+            print(f"[IplPathParser] {len(self.waypoints)} nodes from {os.path.basename(path)}")
+            return bool(self.waypoints)
+        except Exception as ex:
+            print(f"_IplPathParser.load: {ex}"); return False
+
+
+class _WaypointTab(QWidget):  #vers 1
+    def __init__(self, has_speed=True, parent=None):
+        super().__init__(parent)
+        self._parser    = _TextPathParser()
+        self._ipl       = _IplPathParser()
+        self._path      = None
+        self._has_speed = has_speed
+        self._build_ui()
+
+    def _build_ui(self):  #vers 1
+        from PyQt6.QtGui import QFont
+        lay = QVBoxLayout(self); lay.setContentsMargins(4, 4, 4, 4)
+        self._list = QListWidget()
+        self._list.setFont(QFont("Monospace", 9))
+        lay.addWidget(self._list, 1)
+        br = QHBoxLayout()
+        self._status = QLabel("No file loaded")
+        self._status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        br.addWidget(self._status)
+        lay.addLayout(br)
+
+    def load_file(self, path: str, game: str = None) -> bool:  #vers 1
+        self._path = path
+        stem = os.path.splitext(os.path.basename(path).lower())[0]
+        if game == 'sa_ipl' or stem.startswith('paths'):
+            ok  = self._ipl.load(path)
+            wps = self._ipl.waypoints
+        else:
+            ok  = self._parser.load(path)
+            wps = self._parser.waypoints
+        if ok:
+            self._list.clear()
+            for i, w in enumerate(wps):
+                self._list.addItem(f"[{i:4d}] {w.x:9.2f} {w.y:9.2f} {w.z:7.2f}"
+                                   + (f"  spd:{w.speed:.1f}" if self._has_speed else ""))
+            self._status.setText(f"{os.path.basename(path)} — {len(wps)} waypoints")
+        return ok
+
+    @property
+    def current_path(self): return self._path
+
+    def set_radar(self, img): pass  # interface compat — no map canvas in text tabs
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 class PathsWorkshop(RadarWorkshop):  #vers 4
     App_name   = App_name
     App_build  = App_build
@@ -711,18 +837,8 @@ class PathsWorkshop(RadarWorkshop):  #vers 4
                 if hasattr(tab,'save_file'): tab.save_file(tab.current_path)
                 self._set_status(f"Saved {os.path.basename(tab.current_path)}")
 
-    def _make_text_tab(self, kind: str) -> QWidget:  #vers 1
-        try:
-            base=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),"Path_Workshop")
-            if base not in sys.path: sys.path.insert(0,base)
-            from path_workshop import TrainTab, FlightTab, SpathTab
-            if kind=="train":  return TrainTab()
-            if kind=="flight": return FlightTab()
-            if kind=="spath":  return SpathTab()
-        except ImportError:
-            pass
-        w=QWidget(); l=QVBoxLayout(w)
-        l.addWidget(QLabel(f"{kind} editor — open a .dat file")); return w
+    def _make_text_tab(self, kind: str) -> QWidget:  #vers 2
+        return _WaypointTab(has_speed=(kind in ("train", "flight")))
 
     def _detect_game(self, path: str) -> str:  #vers 1
         stem=os.path.splitext(os.path.basename(path).lower())[0]
