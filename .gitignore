@@ -1,3 +1,9 @@
 apps/utils
 apps/themes
 apps/images
+
+# Build output (made by buildscript.py / GitHub Actions; releases hold the downloads)
+build/
+dist/
+/_internal/
+/*.exe
