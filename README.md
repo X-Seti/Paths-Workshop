@@ -19,5 +19,5 @@ pip install PyQt6
 
 ## Usage
 ```bash
-./paths_workshop.py
+./launch_paths_workshop.py
 ```

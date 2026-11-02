@@ -8,3 +8,6 @@ dist/
 /_internal/
 /*.exe
 .venv/
+/*_dist/
+/Paths_Workshop
+/Paths_Workshop.app/
